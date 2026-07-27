@@ -18,6 +18,15 @@ VERSION=1.0.1
 MODE="${1:-local}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-langtoggle}"
 
+# VERSION 을 안 올린 채 dist 를 돌리면 공증(수 분)을 다 태운 뒤에야 릴리스 단계에서 막힌다.
+# 태그는 gh release create 가 서버에 만들어서 로컬엔 없을 수 있으니 원격까지 본다.
+# 네트워크가 없으면 ls-remote 가 조용히 비고 로컬 검사만 남는다.
+if [ "$MODE" = "dist" ] && { git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null \
+    || git ls-remote --tags origin "v$VERSION" 2>/dev/null | grep -q .; }; then
+  echo "v$VERSION 은 이미 나간 버전이다. 맨 위 VERSION 을 올렸는지 확인." >&2
+  exit 1
+fi
+
 APP=/Applications/LangToggle.app
 BUILD=build/LangToggle.app
 

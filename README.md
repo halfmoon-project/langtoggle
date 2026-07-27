@@ -103,11 +103,8 @@ swiftc -O main.swift -o LangToggle
 ```
 
 버전은 `make_app.sh` 맨 위 `VERSION` 한 곳에서만 고친다 — Info.plist 와 zip 이름이 이걸 따라간다.
-`dist` 가 끝나면 그대로 릴리스에 올린다:
-
-```bash
-gh release create v1.0.1 build/LangToggle-1.0.1.zip --title "LangToggle 1.0.1"
-```
+이미 나간 버전이면 `dist` 가 빌드를 시작하기 전에 멈춘다. 다 끝나면 스크립트가 마지막에 출력하는
+`gh release create ...` 를 그대로 붙여넣어 릴리스한다.
 
 서명·공증 준비물은 `make_app.sh` 주석에 있고, notarytool 프로필이 없으면 스크립트가 등록 방법을 출력한다.
 
