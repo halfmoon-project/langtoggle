@@ -33,6 +33,25 @@ func currentID() -> String {
     str(TISCopyCurrentKeyboardInputSource().takeRetainedValue(), kTISPropertyInputSourceID)
 }
 
+/// 입력 소스가 표방하는 언어들. 첫 값이 대표 언어다 — "ko", "en", "ja", "zh-Hans" …
+private func languages(_ s: TISInputSource) -> [String] {
+    guard let p = TISGetInputSourceProperty(s, kTISPropertyInputSourceLanguages) else { return [] }
+    return Unmanaged<CFArray>.fromOpaque(p).takeUnretainedValue() as? [String] ?? []
+}
+
+func currentLanguage() -> String {
+    languages(TISCopyCurrentKeyboardInputSource().takeRetainedValue()).first ?? "en"
+}
+
+/// "zh-Hans" → ["zh-Hans", "zh", "en"]. 지역 태그가 붙어 와도 기본 아이콘을 찾아가고,
+/// 매핑이 없는 언어(독일어·프랑스어처럼 라틴 자판)는 en 으로 떨어진다.
+func assetChain(_ lang: String) -> [String] {
+    var chain = [lang]
+    if let base = lang.split(separator: "-").first.map(String.init), base != lang { chain.append(base) }
+    if !chain.contains("en") { chain.append("en") }
+    return chain
+}
+
 /// ponytail: cycles the enabled sources like Cmd+Space. With ABC + 2-Set Korean that IS 한/영.
 func toggleLanguage() {
     let sources = keyboardSources()
@@ -68,8 +87,16 @@ if CommandLine.arguments.contains("--selftest") {
 // MARK: - Icon
 
 final class IconView: NSView {
+    /// 아이콘 PNG 가 하나도 없을 때 그릴 텍스트 배지. build_icons.py 의 GLYPHS 와 같이 고친다.
+    /// 전역 let 으로 두면 안 된다 — main.swift 의 전역은 선언 문장이 실행돼야 초기화되는데
+    /// --dump 가 그보다 먼저 IconView 를 그려서 초기화 전 메모리를 읽는다. 타입 프로퍼티는 지연 초기화라 안전하다.
+    private static let glyphs = [
+        "en": "A", "ko": "한", "ja": "あ", "zh": "中", "ru": "Я", "el": "Ω",
+        "th": "ก", "ar": "ع", "he": "א", "hi": "अ", "vi": "Ư",
+    ]
+
     private var downAt = NSPoint.zero
-    private var images: [String: NSImage] = [:]
+    private var images: [String: NSImage?] = [:]
     private var press: CGFloat = 0 { didSet { needsDisplay = true } }
     private var anim: Timer?
 
@@ -89,29 +116,32 @@ final class IconView: NSView {
 
     private func image(_ name: String) -> NSImage? {
         if let cached = images[name] { return cached }
-        for dir in [overrideDir, bundledDir] {
-            if let img = NSImage(contentsOf: dir.appendingPathComponent("\(name).png")) {
-                images[name] = img
-                return img
-            }
-        }
-        return nil
+        // 매핑 없는 언어면 그릴 때마다 디스크를 두드리게 되므로 실패도 캐시한다.
+        let found = [overrideDir, bundledDir].lazy
+            .compactMap { NSImage(contentsOf: $0.appendingPathComponent("\(name).png")) }
+            .first
+        images[name] = found
+        return found
     }
 
     override func draw(_ dirty: NSRect) {
-        let korean = currentID().contains("Korean")
         // 눌리면 살짝 작아지면서 아래로 가라앉는다 — 3/4 뷰에서 키캡이 눌리는 방향.
         let rect = bounds
             .insetBy(dx: bounds.width * 0.05 * press, dy: bounds.height * 0.05 * press)
             .offsetBy(dx: 0, dy: -bounds.height * 0.05 * press)
-        if let img = image(korean ? "ko" : "en") {
-            img.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        // 바디는 모든 언어가 공유하고, 그 위에 언어별 글리프 레이어만 갈아 끼운다.
+        let chain = assetChain(currentLanguage())
+        let body = image("keycap")
+        let glyph = chain.lazy.compactMap { self.image($0) }.first
+        if body != nil || glyph != nil {
+            body?.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            glyph?.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
             return
         }
         // ponytail: text badge fallback when the keycap PNGs are missing
         NSColor(red: 0.118, green: 0.161, blue: 0.231, alpha: 1).setFill() // halfmoon gray.800
         NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7).fill()
-        let text = NSAttributedString(string: korean ? "한" : "A", attributes: [
+        let text = NSAttributedString(string: chain.lazy.compactMap { Self.glyphs[$0] }.first ?? "A", attributes: [
             .font: NSFont.systemFont(ofSize: 20, weight: .semibold),
             .foregroundColor: NSColor(red: 0.973, green: 0.980, blue: 0.988, alpha: 1), // gray.50
         ])

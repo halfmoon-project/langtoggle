@@ -26,13 +26,15 @@ rm -rf build "$BUILD"
 mkdir -p "$BUILD/Contents/MacOS" "$BUILD/Contents/Resources/assets"
 
 swiftc -O main.swift -o "$BUILD/Contents/MacOS/LangToggle"
-cp assets/ko.png assets/en.png "$BUILD/Contents/Resources/assets/"
+# 키캡 바디 한 장 + 언어별 글리프 레이어. assets/design/ 은 빌드 입력이라 안 들어간다.
+cp assets/*.png "$BUILD/Contents/Resources/assets/"
 # 로그인 항목 목록과 Finder에 보일 아이콘. sips -s format icns 는 실패해서 iconutil 을 쓴다.
+# 표시용 아이콘은 176px 라 .icns 에는 축소 전 원본(assets/design/appicon.png)을 쓴다.
 ICONSET=build/LangToggle.iconset
 mkdir -p "$ICONSET"
 for s in 16 32 128 256 512; do
-  sips -z $s $s assets/ko.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) assets/ko.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+  sips -z $s $s assets/design/appicon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) assets/design/appicon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$BUILD/Contents/Resources/LangToggle.icns"
 
