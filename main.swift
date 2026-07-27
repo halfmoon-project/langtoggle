@@ -74,6 +74,12 @@ if CommandLine.arguments.contains("--dump") {
 }
 
 if CommandLine.arguments.contains("--selftest") {
+    // 드래그 → 크기. -O 로 빌드하면 assert 가 지워지니 이 검사는 최적화 없이 돌린다.
+    assert(IconView.dragSize(44, dx: 12, dy: 0) == 56, "오른쪽으로 끌면 커진다")
+    assert(IconView.dragSize(44, dx: -12, dy: 0) == 32, "왼쪽으로 끌면 줄어든다")
+    assert(IconView.dragSize(44, dx: 0, dy: 12) == 56, "아래로 끌면 커진다")
+    assert(IconView.dragSize(44, dx: 3, dy: -12) == 32, "많이 움직인 축을 따른다")
+
     let a = currentID()
     toggleLanguage(); usleep(300_000)
     let b = currentID()
@@ -95,7 +101,28 @@ final class IconView: NSView {
         "th": "ก", "ar": "ع", "he": "א", "hi": "अ", "vi": "Ư",
     ]
 
+    /// 크기 한계. 최대는 에셋이 정한다 — 키캡 PNG 가 176px 라 88pt 를 넘기면 레티나에서 뿌옇다.
+    static let minSide: CGFloat = 28
+    static let maxSide: CGFloat = 88
+
+    /// 커서를 못 바꾸니(백그라운드 앱) 리사이즈 커서 모양을 그려서 대신 보여 준다.
+    private static let gripIcon = NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right",
+                                          accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 64, weight: .bold).applying(.init(paletteColors: [.white])))
+
+    /// 드래그한 거리 → 새 크기. 많이 움직인 축을 1:1 로 따라간다(오른쪽·아래가 확대).
+    /// 두 축을 섞어 평균 내면 커서보다 느리게 따라와서 손에 안 붙고, 큰 쪽만 쓰면 한 축으로는 안 줄어든다.
+    static func dragSize(_ start: CGFloat, dx: CGFloat, dy: CGFloat) -> CGFloat {
+        start + (abs(dx) > abs(dy) ? dx : dy)
+    }
+
+    private var hover = false { didSet { if hover != oldValue { needsDisplay = true } } }
+    private var poll: Timer?
     private var downAt = NSPoint.zero
+    private var startFrame = NSRect.zero
+    private var startMouse = NSPoint.zero
+    private var inGrip = false
+    private var didResize = false
     private var images: [String: NSImage?] = [:]
     private var press: CGFloat = 0 { didSet { needsDisplay = true } }
     private var anim: Timer?
@@ -136,28 +163,94 @@ final class IconView: NSView {
         if body != nil || glyph != nil {
             body?.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
             glyph?.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            drawGrip(rect)
             return
         }
         // ponytail: text badge fallback when the keycap PNGs are missing
         NSColor(red: 0.118, green: 0.161, blue: 0.231, alpha: 1).setFill() // halfmoon gray.800
-        NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7).fill()
+        let r = bounds.width * 0.16
+        NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: r, yRadius: r).fill()
         let text = NSAttributedString(string: chain.lazy.compactMap { Self.glyphs[$0] }.first ?? "A", attributes: [
-            .font: NSFont.systemFont(ofSize: 20, weight: .semibold),
+            .font: NSFont.systemFont(ofSize: bounds.height * 0.45, weight: .semibold),
             .foregroundColor: NSColor(red: 0.973, green: 0.980, blue: 0.988, alpha: 1), // gray.50
         ])
         let size = text.size()
         text.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2))
+        drawGrip(rect)
+    }
+
+    /// 손잡이에 마우스를 올렸을 때만 뜨는 화살표. 평소엔 키캡을 깨끗하게 둔다.
+    /// 좌표는 키캡 아트의 오른쪽 옆면 위 — 정확히 모서리에 두면 투명한 여백에 그려진다.
+    private func drawGrip(_ rect: NSRect) {
+        guard hover, let icon = Self.gripIcon else { return }
+        let d = rect.width * 0.24
+        icon.draw(in: NSRect(x: rect.minX + rect.width * 0.66 - d / 2,
+                             y: rect.minY + rect.height * 0.28 - d / 2, width: d, height: d),
+                  from: .zero, operation: .sourceOver, fraction: 0.85)
     }
 
     // 패널이 key window가 안 되므로, 이게 없으면 첫 클릭이 삼켜진다.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    // 포커스를 안 뺏는 패널이라 커서는 못 바꾼다 — 백그라운드 앱의 NSCursor.set() 은 무시된다.
+    // 창 단위 진입/이탈만 오고 창 안쪽 영역 진입도 mouseMoved 도 안 온다.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds,
+                                       options: [.mouseEnteredAndExited, .activeAlways], owner: self))
+    }
+
+    /// 그래서 커서가 손잡이 위에 있는지는 창 안에 들어와 있는 동안만 좌표를 훑어서 안다.
+    /// ponytail: 15Hz 폴링. 들어와 있을 때만 돌고 나가면 멈춘다.
+    override func mouseEntered(with e: NSEvent) {
+        poll?.invalidate()
+        poll = Timer.scheduledTimer(withTimeInterval: 1 / 15, repeats: true) { [weak self] t in
+            guard let self, let w = window else { return t.invalidate() }
+            let m = NSEvent.mouseLocation
+            // 이탈 이벤트를 놓쳐도 타이머가 남지 않게 창 밖이면 여기서 정리한다.
+            guard w.frame.contains(m) else { return self.mouseExited(with: e) }
+            hover = didResize || grip.contains(convert(w.convertPoint(fromScreen: m), from: nil))
+        }
+    }
+
+    override func mouseExited(with e: NSEvent) {
+        poll?.invalidate()
+        poll = nil
+        hover = false
+    }
+
+    /// 우하단 리사이즈 손잡이. 화살표(drawGrip)가 그려지는 자리를 넉넉히 덮는다.
+    /// 여기서 끌면 크기가 바뀌고, 그냥 누르면 평소대로 전환된다 —
+    /// 안 그러면 키캡 우하단을 눌렀을 때 아무 일도 안 일어난다.
+    private var grip: NSRect {
+        let g = bounds.width * 0.42
+        return NSRect(x: bounds.maxX - g, y: bounds.minY, width: g, height: g)
+    }
+
     override func mouseDown(with e: NSEvent) {
         downAt = e.locationInWindow
+        inGrip = grip.contains(convert(e.locationInWindow, from: nil))
+        didResize = false
+        startFrame = window?.frame ?? .zero
+        startMouse = NSEvent.mouseLocation
         setPress(1)
     }
 
     override func mouseDragged(with e: NSEvent) {
+        if inGrip {
+            // 창이 커지면 locationInWindow 기준이 흔들린다 — 화면 좌표로 계산한다.
+            let m = NSEvent.mouseLocation
+            if !didResize {
+                guard hypot(m.x - startMouse.x, m.y - startMouse.y) > 3 else { return }
+                didResize = true
+                setPress(0)
+            }
+            resize(to: Self.dragSize(startFrame.height,
+                                     dx: m.x - startMouse.x, dy: startMouse.y - m.y),
+                   anchor: startFrame)
+            return
+        }
         let moved = hypot(e.locationInWindow.x - downAt.x, e.locationInWindow.y - downAt.y)
         // performDrag는 마우스를 삼켜서 mouseUp이 안 온다 — 여기서 미리 올려준다.
         if moved > 3 { setPress(0); window?.performDrag(with: e) }
@@ -165,7 +258,23 @@ final class IconView: NSView {
 
     override func mouseUp(with e: NSEvent) {
         setPress(0)
-        toggleLanguage()
+        if !didResize { toggleLanguage() }
+        didResize = false  // 끄는 동안 화살표를 붙잡아 두던 플래그 — 여기서 푼다.
+    }
+
+    /// 좌상단(anchor 기준)을 고정해 손잡이 쪽으로 자란다. 기본 위치가 화면 우상단이라 그대로 두면
+    /// 오른쪽/아래로 삐져나가고, 그 위치가 저장돼 다음 실행 때 화면 밖에서 뜬다.
+    private func resize(to s: CGFloat, anchor: NSRect? = nil) {
+        guard let w = window else { return }
+        let base = anchor ?? w.frame
+        let side = min(Self.maxSide, max(Self.minSide, s))
+        var f = NSRect(x: base.minX, y: base.maxY - side, width: side, height: side)
+        if let vf = w.screen?.visibleFrame {
+            f.origin.x = min(f.minX, vf.maxX - side)
+            f.origin.y = max(f.minY, vf.minY)
+        }
+        w.setFrame(f, display: true)
+        UserDefaults.standard.set(Double(side), forKey: "side")
     }
 
     override func rightMouseDown(with e: NSEvent) {
@@ -175,6 +284,17 @@ final class IconView: NSView {
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         // 맨 바이너리로 실행하면 등록할 번들이 없다.
         login.isEnabled = Bundle.main.bundleIdentifier != nil
+        menu.addItem(.separator())
+        // 손잡이(우하단 드래그)는 눈에 잘 안 띈다 — 여기가 크기 조절의 발견 경로다.
+        let sizeItem = menu.addItem(withTitle: "크기", action: nil, keyEquivalent: "")
+        let sizes = NSMenu()
+        for (name, s) in [("작게", 32), ("보통", 44), ("크게", 64), ("최대", 88)] {
+            let item = sizes.addItem(withTitle: "\(name) (\(s)pt)", action: #selector(setSize(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = s
+            item.state = abs((window?.frame.height ?? 0) - CGFloat(s)) < 0.5 ? .on : .off
+        }
+        menu.setSubmenu(sizes, for: sizeItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "아이콘 새로고침", action: #selector(reloadImage), keyEquivalent: "").target = self
         menu.addItem(withTitle: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
@@ -191,6 +311,8 @@ final class IconView: NSView {
         // 사용자가 시스템 설정에서 껐던 적이 있으면 수동 승인이 필요하다.
         if service.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
     }
+
+    @objc private func setSize(_ sender: NSMenuItem) { resize(to: CGFloat(sender.tag)) }
 
     @objc private func reloadImage() {
         images.removeAll()
@@ -209,7 +331,9 @@ if let id = Bundle.main.bundleIdentifier,
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-let side: CGFloat = 44
+// 저장된 크기. 없으면 double(forKey:)가 0 을 주므로 기본값으로 떨어뜨린다.
+let saved = UserDefaults.standard.double(forKey: "side")
+let side = saved > 0 ? min(IconView.maxSide, max(IconView.minSide, CGFloat(saved))) : 44
 let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: side, height: side),
                     styleMask: [.borderless, .nonactivatingPanel],
                     backing: .buffered, defer: false)
