@@ -2,3 +2,12 @@ LangToggle
 build/
 .venv/
 .DS_Store
+
+# 서명/공증 비밀 — 실수로라도 커밋 금지 (repo 안에 둘 이유 없음)
+*.p8
+*.p12
+*.cer
+*.pem
+*.key
+*.certSigningRequest
+*.mobileprovision
