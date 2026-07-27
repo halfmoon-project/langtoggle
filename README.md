@@ -12,6 +12,28 @@
 (`SMAppService`, macOS 13+). 개발자 계정·공증·DMG 전부 불필요 — 로컬 빌드는 격리 속성이
 안 붙어서 Gatekeeper가 막지 않는다.
 
+## 배포 (남한테 주기)
+
+```bash
+./make_app.sh dist   # 빌드 -> Developer ID 서명 + 하드닝 런타임 -> 공증 -> staple -> zip
+```
+
+`build/LangToggle.zip` 이 나온다. 이 zip 은 아무 맥에서 받아도 경고 없이 열린다
+(Gatekeeper: `Notarized Developer ID`). 로컬 설치와 달리 이건 애플 공증까지 거치므로,
+받는 쪽에서 `xattr` 를 떼거나 우클릭 열기를 할 필요가 없다.
+
+준비물(최초 1회):
+- **Developer ID Application** 인증서 (유료 Apple Developer Program). 키체인에 설치돼 있으면
+  스크립트가 해시로 자동으로 찾아 쓴다.
+- 공증용 notarytool 키체인 프로필. 이름은 `langtoggle`(환경변수 `NOTARY_PROFILE` 로 변경 가능):
+
+  ```bash
+  xcrun notarytool store-credentials "langtoggle" \
+    --key <AuthKey_XXXX.p8 경로> --key-id <KEY_ID> --issuer <ISSUER_UUID>
+  ```
+
+  프로필이 없으면 `dist` 는 서명·검증까지만 하고 이 안내를 출력한 뒤 멈춘다.
+
 개발 중에는 번들 없이 그냥 돌려도 된다:
 
 ```bash
@@ -51,9 +73,10 @@ uv run --with pillow --with numpy python build_icons.py
 - macOS 13+ 와 Xcode Command Line Tools(`swiftc`)가 필요하다.
 - 입력 소스 전환은 Carbon `TISSelectInputSource` — 접근성 권한이 필요 없다.
 - 창은 `.nonactivatingPanel`이라 클릭해도 현재 앱의 포커스를 빼앗지 않는다.
-- `make_app.sh`의 서명은 ad-hoc(`codesign -s -`)이다. 직접 빌드하면 격리 속성이 안 붙어서
-  문제없지만, 이 `.app`을 zip으로 배포하면 받는 쪽에서 Gatekeeper가 막는다
-  (공증에는 Developer ID 인증서가 필요). 배포하려면 각자 빌드하는 게 맞다.
+- `make_app.sh`(인자 없음)의 서명은 ad-hoc(`codesign -s -`)이다. 직접 빌드하면 격리 속성이
+  안 붙어서 자기 맥에선 문제없지만, 이 `.app`을 그대로 zip으로 배포하면 받는 쪽에서
+  Gatekeeper가 막는다. 남한테 주려면 위 **배포** 절의 `./make_app.sh dist`(Developer ID
+  서명 + 공증)를 쓴다.
 
 ## 라이센스
 
