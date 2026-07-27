@@ -1,6 +1,39 @@
-# LangToggle
+<p align="center">
+  <img src="./assets/readme/langtoggle-hero.png" alt="한 번의 클릭으로 한글과 영문 입력을 전환하는 LangToggle 키캡" width="100%">
+</p>
 
-화면에 항상 떠 있는 키캡 아이콘. 클릭하면 한/영 입력 소스가 바뀐다.
+<h1 align="center">LangToggle</h1>
+
+<p align="center">
+  <strong>원격 Mac의 입력 언어를, 화면 위 작은 키 하나로.</strong><br>
+  현재 언어를 보여 주고 클릭 한 번으로 다음 입력 소스로 전환하는 macOS 유틸리티.
+</p>
+
+## 왜 만들었나
+
+Chrome Remote Desktop으로 Mac을 사용하다 보면 키 설정이 기대대로 동작하지 않아, 화면 우측 상단의
+입력기 버튼을 두 번씩 눌러 언어를 바꿔야 할 때가 있었다. 작은 전환 하나가 작업 흐름을 계속 끊었다.
+
+LangToggle은 그 번거로움에서 출발했다. 화면 위에 **실제 키처럼 보이는 키캡**을 띄우고, 누르면
+입력 소스가 바뀌게 했다. 지금 선택된 언어가 키캡에 바로 표시되므로 현재 상태를 확인하기 위해
+메뉴를 다시 열 필요도 없다.
+
+Chrome Remote Desktop뿐 아니라 원격 제어 중 한/영 키가 제대로 전달되지 않을 때, 키보드 단축키보다
+눈에 보이는 전환 버튼이 편할 때도 그대로 쓸 수 있다.
+
+## 이렇게 동작한다
+
+<p align="center">
+  <img src="./assets/readme/langtoggle-demo.gif" alt="LangToggle 키캡을 눌러 한글과 영문 입력을 전환하는 모습" width="310">
+</p>
+
+- **클릭** — 활성화된 입력 소스를 차례로 순환한다. `ABC`와 `2-Set Korean`만 켜 뒀다면 곧바로
+  한/영 전환이 된다. 누를 때 키캡이 실제 키처럼 내려갔다 튕겨 올라온다.
+- **드래그** — 원하는 곳으로 옮긴다. 위치는 자동 저장된다.
+- **우클릭** — 로그인 시 자동 실행, 아이콘 새로고침, 종료 메뉴를 연다.
+
+키캡은 모든 데스크톱과 전체 화면 앱 위에 떠 있지만, 클릭해도 사용 중인 앱의 포커스를 빼앗지 않는다.
+접근성 권한도 필요 없다.
 
 ## 설치
 
@@ -13,21 +46,43 @@
 Developer ID 서명 + 애플 공증(Notarized Developer ID)까지 돼 있어 경고 없이 바로 열린다.
 `xattr` 를 떼거나 우클릭 열기를 할 필요가 없다.
 
-## 사용
-
-- **클릭** — 다음 입력 소스로 전환 (ABC ↔ 2세트 한글). 누르면 키캡이 눌렸다 튕겨 올라온다.
-- **드래그** — 위치 이동, 위치는 자동 저장
-- **우클릭** — 로그인 시 자동 실행 / 아이콘 새로고침 / 종료 (안 먹으면 `pkill -f LangToggle`)
-
 **로그인 시 자동 실행**을 켜면 재부팅 후에도 뜬다(`SMAppService`).
 키캡을 클릭해도 지금 쓰던 앱의 포커스는 그대로다 — 창이 `.nonactivatingPanel` 이라 입력을 뺏지 않는다.
 
+> 우클릭 메뉴가 응답하지 않을 때는 터미널에서 `pkill -f LangToggle`로 종료한 뒤 다시 실행한다.
+
+## 언어
+
+한/영에 한정되지 않는다. 전환은 활성화된 입력 소스 전부를 순환하고, 키캡 글리프는 현재
+입력 소스의 `kTISPropertyInputSourceLanguages` 첫 값으로 고른다.
+
+| 언어 | 글리프 | | 언어 | 글리프 | | 언어 | 글리프 |
+|---|---|---|---|---|---|---|---|
+| `en` 영어 | A | | `ru` 러시아어 | Я | | `he` 히브리어 | א |
+| `ko` 한국어 | 한 | | `el` 그리스어 | Ω | | `hi` 힌디어 | अ |
+| `ja` 일본어 | あ | | `th` 태국어 | ก | | `vi` 베트남어 | Ư |
+| `zh` 중국어 | 中 | | `ar` 아랍어 | ع | | | |
+
+찾는 순서는 `zh-Hans` → `zh` → `en` 이다. 지역 태그가 붙어도 기본 글리프를 찾아가고, 표에 없는
+언어(독일어·프랑스어처럼 라틴 자판을 쓰는 것들)는 `en` 의 `A` 로 떨어진다.
+
+`한` 을 뺀 모든 글리프에 파란 점이 붙는다 — 라틴 자판이 아니라는 표시다.
+
+> 일본어 IME 의 로마자 입력(英数)처럼 **같은 입력 소스 안에서 모드만 바뀌는 경우**는 구분하지
+> 못한다. macOS 가 그걸 별도 입력 소스로 보고하긴 하지만 언어는 똑같이 `ja` 라서 전부 `あ` 로 뜬다.
+
 ## 아이콘 커스텀
 
-`~/Library/Application Support/LangToggle/` 에 `ko.png`, `en.png` 를 두면 그게 우선 적용된다.
-바꾼 뒤에는 우클릭 → 아이콘 새로고침.
-없으면 번들 안의 기본 키캡을 쓰고, 그것도 없으면 텍스트 배지(`한`/`A`)로 폴백한다.
-번들 내부를 직접 고치면 서명이 깨지므로 이 경로를 쓴다.
+`~/Library/Application Support/LangToggle/` 에 같은 이름의 PNG 를 두면 그게 우선 적용된다.
+바꾼 뒤에는 우클릭 → 아이콘 새로고침. 번들 내부를 고치면 서명이 깨지므로 이 경로를 쓴다.
+
+- `keycap.png` — 키캡 바디. 모든 언어가 공유한다.
+- `<언어코드>.png` — 그 위에 겹쳐 그리는 글리프 레이어(배경 투명). `ko.png`, `ja.png` …
+
+글리프만 바꾸려면 언어 파일 하나만, 키캡 모양까지 바꾸려면 `keycap.png` 를 둔다. 불투명한 통짜
+키캡 이미지를 `<언어코드>.png` 로 넣어도 바디를 완전히 덮으므로 그대로 동작한다.
+표에 없는 언어도 `de.png` 처럼 파일만 두면 바로 잡힌다.
+PNG 가 하나도 없으면 텍스트 배지로 폴백한다.
 
 ## 요구사항
 
@@ -56,15 +111,25 @@ gh release create v1.0.0 build/LangToggle-1.0.0.zip --title "LangToggle 1.0.0"
 
 서명·공증 준비물은 `make_app.sh` 주석에 있고, notarytool 프로필이 없으면 스크립트가 등록 방법을 출력한다.
 
-아이콘은 `build_icons.py` 가 만든다. `assets/keycap-master-v2.png` 는 우측 상단에서 본 3/4 대각선
-키캡이고 윗면이 `#ff00ff` 로 비워져 있다 — 그 마커 영역을 찾아 윗면 색으로 칠하고 글리프를 원근
-변환으로 얹는다. 바디를 두 아이콘이 공유하므로 실루엣이 픽셀 단위로 같아 토글할 때 흔들리지 않는다.
-글리프를 바꾸려면 `OUTPUTS` 만 고치고 다시 돌린다.
+아이콘은 `build_icons.py` 가 만든다. `assets/design/keycap-master-v2.png` 는 우측 상단에서 본 3/4
+대각선 키캡이고 윗면이 `#ff00ff` 로 비워져 있다 — 그 마커 영역을 찾아 윗면 색으로 칠한 게
+`keycap.png`, 같은 영역에 글리프를 원근 변환으로 얹은 게 언어별 레이어다. 바디를 모든 언어가
+공유하므로 실루엣이 픽셀 단위로 같아 전환할 때 흔들리지 않고, 언어를 늘려도 번들은 몇 KB 만 는다
+(전체 `assets/*.png` 가 36KB). 표시 크기가 44pt(레티나 88px)라 아이콘은 176px 로 굽는다 —
+`.icns` 는 1024px 를 요구해서 축소 전 원본을 `assets/design/appicon.png` 에 따로 남기고, 이건
+번들에 안 들어간다.
+
+언어를 추가하려면 `GLYPHS` 에 한 줄 넣고 다시 돌린 뒤 `main.swift` 의 `glyphs`(텍스트 폴백)도
+같이 고친다. 폰트는 키캡 굵기(SemiBold/W6)에 맞춰 스크립트별로 고르고 — 한글 Apple SD Gothic Neo,
+일본어 Hiragino Sans, 중국어 Hiragino Sans GB, 데바나가리 Kohinoor, 아랍어 Geeza Pro — 전용 폰트에
+없는 글리프는 Arial Unicode MS 로 떨어진다. 그 글리프들을 전부 가진 유일한 시스템 폰트지만
+Regular 한 종류뿐이라 우선순위가 맨 뒤다. 실제로 글리프를 가졌는지 cmap 으로 확인하므로 두부(.notdef)가
+구워지는 대신 빌드가 실패한다.
 색은 [halfmoon 디자인 시스템](https://github.com/halfmoon-project/halfmoon-design) 토큰을 따른다
 (gray.800 바디, gray.700 윗면, gray.50 글리프, blue.600 액센트).
 
 ```bash
-uv run --with pillow --with numpy python build_icons.py
+uv run --with pillow --with numpy --with fonttools python build_icons.py
 ```
 
 ## 라이센스

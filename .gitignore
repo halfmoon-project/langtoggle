@@ -2,6 +2,7 @@ LangToggle
 build/
 .venv/
 .DS_Store
+.orca/
 
 # 서명/공증 비밀 — 실수로라도 커밋 금지 (repo 안에 둘 이유 없음)
 *.p8
