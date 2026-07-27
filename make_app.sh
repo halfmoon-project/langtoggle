@@ -11,6 +11,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# 버전은 여기 한 곳만 고친다. Info.plist 와 배포 zip 이름이 이걸 따라간다.
+# 릴리스 태그도 같은 숫자를 쓴다: gh release create v$VERSION build/LangToggle-$VERSION.zip
+VERSION=1.0.0
+
 MODE="${1:-local}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-langtoggle}"
 
@@ -32,7 +36,8 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$BUILD/Contents/Resources/LangToggle.icns"
 
-cat > "$BUILD/Contents/Info.plist" <<'PLIST'
+# 따옴표 없는 heredoc — $VERSION 을 치환한다. 본문에 다른 $ 나 백틱이 없어야 한다.
+cat > "$BUILD/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -42,8 +47,8 @@ cat > "$BUILD/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.sanghyeon.langtoggle</string>
   <key>CFBundleIconFile</key><string>LangToggle</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleVersion</key><string>1</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>$VERSION</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
 </dict></plist>
@@ -87,7 +92,7 @@ codesign --force --timestamp --options runtime --sign "$SIGN_ID" "$BUILD"
 codesign --verify --strict --verbose=2 "$BUILD"
 echo "서명 검증 통과."
 
-ZIP=build/LangToggle.zip
+ZIP="build/LangToggle-$VERSION.zip"
 
 # 공증 프로필이 없으면 여기서 멈추고 방법을 안내한다.
 if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
@@ -121,3 +126,4 @@ echo "Gatekeeper 최종 확인:"
 spctl -a -vvv --type execute "$BUILD" || true
 echo
 echo "배포 파일: $ZIP  (이 zip 을 남한테 주면 경고 없이 열린다)"
+echo "릴리스: gh release create v$VERSION $ZIP --title \"LangToggle $VERSION\""
