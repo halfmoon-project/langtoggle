@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 # 버전은 여기 한 곳만 고친다. Info.plist 와 배포 zip 이름이 이걸 따라간다.
 # 릴리스 태그도 같은 숫자를 쓴다: gh release create v$VERSION build/LangToggle-$VERSION.zip
-VERSION=1.2.1
+VERSION=1.2.2
 
 MODE="${1:-local}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-langtoggle}"
