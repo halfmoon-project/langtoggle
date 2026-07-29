@@ -9,8 +9,8 @@
 # 공식 homebrew/cask 는 별·포크 수 기준(notability)이 있어서 아직 안 받아 준다. 자체 탭은 기준이 없다.
 # version/sha256 은 릴리스마다 갈아 준다 — './make_app.sh dist' 가 마지막에 sha256 을 출력한다.
 cask "langtoggle" do
-  version "1.1.0"
-  sha256 "TBD"
+  version "1.2.0"
+  sha256 "a9207d6908308e82b2ef75a206ac8d587a13df4aa77dbd521a73d8524cabf681"
 
   url "https://github.com/halfmoon-project/langtoggle/releases/download/v#{version}/LangToggle-#{version}.zip"
   name "LangToggle"
