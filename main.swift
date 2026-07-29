@@ -68,6 +68,11 @@ if CommandLine.arguments.contains("--click") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--check-update") {
+    Updater.probe()
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--dump") {
     let v = IconView(frame: NSRect(x: 0, y: 0, width: 88, height: 88))
     let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!

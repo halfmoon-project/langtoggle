@@ -31,4 +31,57 @@ enum Updater {
         NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
     }
+
+    /// --check-update. 업데이트가 왜 안 오는지 볼 때 쓴다. UI 없이 피드만 받아 보고
+    /// Sparkle 이 뭘 보고 있는지 그대로 찍는다. 번들 안에서 실행해야 Info.plist 가 읽힌다:
+    ///   /Applications/LangToggle.app/Contents/MacOS/LangToggle --check-update
+    static func probe() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let probe = Probe()
+        // startingUpdater: false 로 만들어 직접 시작한다 — true 로 두면 시작 실패를 에러가 아니라
+        // 모달 경고창으로 알려서, 백그라운드 앱에서는 보이지도 않는 창에 막혀 그냥 멈춘다.
+        let c = SPUStandardUpdaterController(startingUpdater: false,
+                                             updaterDelegate: probe, userDriverDelegate: nil)
+        let u = c.updater
+        print("번들            : \(Bundle.main.bundlePath)")
+        print("현재 버전       : \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")")
+        print("피드            : \(u.feedURL?.absoluteString ?? "(없음)")")
+        do {
+            try u.start()
+            print("startUpdater    : OK")
+        } catch {
+            print("startUpdater    : 실패 — \(error)")
+            return
+        }
+        print("자동 확인       : \(u.automaticallyChecksForUpdates)")
+        print("확인 주기       : \(u.updateCheckInterval)초")
+        print("마지막 확인     : \(u.lastUpdateCheckDate.map(String.init(describing:)) ?? "(없음)")")
+        print("확인 가능       : \(u.canCheckForUpdates)")
+        print("진행 중인 세션  : \(u.sessionInProgress)")
+        print("--- 확인 시작 ---")
+        u.checkForUpdateInformation()
+        RunLoop.main.run(until: Date().addingTimeInterval(30))
+        print("--- 30초 경과, 종료 ---")
+    }
+
+    /// probe() 전용 델리게이트.
+    private final class Probe: NSObject, SPUUpdaterDelegate {
+        func updater(_ updater: SPUUpdater, didFinishLoading appcast: SUAppcast) {
+            print("appcast 로드됨 — 항목 \(appcast.items.count)개: "
+                + appcast.items.map(\.displayVersionString).joined(separator: ", "))
+        }
+
+        func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+            print("업데이트 발견 — \(item.displayVersionString)  \(item.fileURL?.absoluteString ?? "")")
+        }
+
+        func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
+            print("업데이트 없음 — \(error.localizedDescription)")
+        }
+
+        func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+            print("중단 — \(error.localizedDescription)")
+        }
+    }
 }

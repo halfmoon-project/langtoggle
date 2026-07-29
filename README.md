@@ -147,6 +147,9 @@ swiftc -O ./*.swift -F vendor -framework Sparkle \
 ./LangToggle --selftest   # 토글 동작 + 클릭 파형 확인 (assert 가 살아 있어야 하니 -O 없이 빌드)
 ./LangToggle --dump       # 실제 표시 크기(88px) 렌더를 /tmp/langtoggle-render.png 로
 ./LangToggle --click      # 소리 프리셋을 순서대로 하나씩 재생
+
+# 업데이트가 왜 안 오는지 볼 때. 번들 안에서 실행해야 Info.plist 가 읽힌다.
+/Applications/LangToggle.app/Contents/MacOS/LangToggle --check-update
 ```
 
 버전은 `make_app.sh` 맨 위 `VERSION` 한 곳에서만 고친다 — Info.plist 와 zip 이름이 이걸 따라간다.
