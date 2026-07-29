@@ -1,5 +1,7 @@
 LangToggle
 build/
+# Sparkle 프레임워크 캐시. make_app.sh 가 버전/체크섬 박아 두고 없으면 받아 온다.
+vendor/
 .venv/
 .DS_Store
 .orca/

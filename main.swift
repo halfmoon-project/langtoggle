@@ -350,9 +350,15 @@ final class IconView: NSView {
         menu.setSubmenu(sounds, for: soundItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "아이콘 새로고침", action: #selector(reloadImage), keyEquivalent: "").target = self
+        // 평소엔 알아서 업데이트되므로 여기까지 올 일이 없다 — 기다리기 싫은 사람용이다.
+        let update = menu.addItem(withTitle: "업데이트 확인", action: #selector(checkUpdate), keyEquivalent: "")
+        update.target = self
+        update.isEnabled = Updater.available
         menu.addItem(withTitle: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         menu.popUp(positioning: nil, at: e.locationInWindow, in: self)
     }
+
+    @objc private func checkUpdate() { Updater.checkNow() }
 
     @objc private func toggleLoginItem() {
         let service = SMAppService.mainApp
@@ -420,4 +426,5 @@ DistributedNotificationCenter.default().addObserver(
     object: nil, queue: .main
 ) { _ in panel.contentView?.needsDisplay = true }
 
+Updater.start()
 app.run()

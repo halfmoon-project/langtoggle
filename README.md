@@ -33,14 +33,18 @@ Chrome Remote Desktop뿐 아니라 원격 제어 중 한/영 키가 제대로 �
 - **드래그** — 원하는 곳으로 옮긴다. 위치는 자동 저장된다.
 - **우하단 모서리에서 드래그** — 키캡 크기를 바꾼다. 28pt에서 88pt 사이, 크기도 자동 저장된다.
   모서리를 그냥 클릭하면 평소대로 언어가 전환된다.
-- **우클릭** — 로그인 시 자동 실행, 크기 프리셋, 소리, 아이콘 새로고침, 종료 메뉴를 연다.
+- **우클릭** — 로그인 시 자동 실행, 크기 프리셋, 소리, 아이콘 새로고침, 업데이트 확인, 종료 메뉴를 연다.
 
 키캡은 모든 데스크톱과 전체 화면 앱 위에 떠 있지만, 클릭해도 사용 중인 앱의 포커스를 빼앗지 않는다.
 접근성 권한도 필요 없다.
 
 ## 설치
 
-[최신 릴리스](https://github.com/halfmoon-project/langtoggle/releases/latest)에서 zip 을 받는다.
+```bash
+brew install --cask halfmoon-project/tap/langtoggle
+```
+
+또는 [최신 릴리스](https://github.com/halfmoon-project/langtoggle/releases/latest)에서 zip 을 받아서:
 
 1. 압축 해제
 2. `LangToggle.app` 을 **응용 프로그램(Applications)** 으로 이동
@@ -51,6 +55,20 @@ Developer ID 서명 + 애플 공증(Notarized Developer ID)까지 돼 있어 경
 
 **로그인 시 자동 실행**을 켜면 재부팅 후에도 뜬다(`SMAppService`).
 키캡을 클릭해도 지금 쓰던 앱의 포커스는 그대로다 — 창이 `.nonactivatingPanel` 이라 입력을 뺏지 않는다.
+
+## 업데이트
+
+할 게 없다. 하루에 한 번 조용히 확인하고, 새 버전이 있으면 받아 뒀다가 다음에 실행될 때 그걸로 뜬다.
+로그인 시 자동 실행을 켜 뒀다면 그 "다음" 이 다음 로그인이라, 어느 날 그냥 새 버전이 돼 있다.
+알림도 안 뜨고 물어보지도 않는다. 기다리기 싫으면 우클릭 → **업데이트 확인**.
+
+실행 중인 앱을 그 자리에서 갈아치우지 않는 건, 아직 메모리에 안 올라온 코드 페이지를 나중에
+폴트할 때 터지기 때문이다. [Sparkle](https://sparkle-project.org) 이 설치를 별도 프로세스로
+빼 두는 이유이기도 하다. 업데이트 파일은 EdDSA 서명으로 검증하므로 배포 경로가 뚫려도 남의 빌드가
+설치되지 않는다.
+
+`brew` 로 깐 경우에도 업데이트는 앱이 직접 한다 — cask 에 `auto_updates true` 가 있어서
+`brew upgrade` 가 이미 새로워진 앱을 옛 버전으로 되돌리지 않는다.
 
 > 우클릭 메뉴가 응답하지 않을 때는 터미널에서 `pkill -f LangToggle`로 종료한 뒤 다시 실행한다.
 
@@ -119,21 +137,44 @@ PNG 가 하나도 없으면 텍스트 배지로 폴백한다.
 ## 개발
 
 ```bash
-swiftc -O ./*.swift -o LangToggle
+./make_app.sh             # 빌드 → ad-hoc 서명 → /Applications 설치 → 실행
+./make_app.sh dist        # Developer ID 서명 → 공증 → staple → build/LangToggle-<버전>.zip
+
+# 번들 없이 굴릴 때. Sparkle 을 링크하므로 vendor/ 가 있어야 하고, 그건 make_app.sh 가 채운다.
+swiftc -O ./*.swift -F vendor -framework Sparkle \
+  -Xlinker -rpath -Xlinker @executable_path/vendor -o LangToggle
 ./LangToggle              # 번들 없이 실행 (Dock 아이콘 없음)
 ./LangToggle --selftest   # 토글 동작 + 클릭 파형 확인 (assert 가 살아 있어야 하니 -O 없이 빌드)
 ./LangToggle --dump       # 실제 표시 크기(88px) 렌더를 /tmp/langtoggle-render.png 로
 ./LangToggle --click      # 소리 프리셋을 순서대로 하나씩 재생
-
-./make_app.sh             # 빌드 → ad-hoc 서명 → /Applications 설치 → 실행
-./make_app.sh dist        # Developer ID 서명 → 공증 → staple → build/LangToggle-<버전>.zip
 ```
 
 버전은 `make_app.sh` 맨 위 `VERSION` 한 곳에서만 고친다 — Info.plist 와 zip 이름이 이걸 따라간다.
 이미 나간 버전이면 `dist` 가 빌드를 시작하기 전에 멈춘다. 다 끝나면 스크립트가 마지막에 출력하는
-`gh release create ...` 를 그대로 붙여넣어 릴리스한다.
+`gh release create ...` → `appcast.xml` 커밋 → 탭 리포의 cask 갱신 순서를 그대로 따라간다.
+**`appcast.xml` 은 릴리스가 올라간 뒤에 커밋한다** — 아직 없는 다운로드 URL 을 가리키기 때문이다.
 
 서명·공증 준비물은 `make_app.sh` 주석에 있고, notarytool 프로필이 없으면 스크립트가 등록 방법을 출력한다.
+
+### Sparkle
+
+프레임워크는 리포에 없다. `make_app.sh` 가 버전과 SHA256 을 박아 두고 없으면 받아서 `vendor/` 에
+캐시한다. 번들에 들어가는 건 원본(3.0MB)이 아니라 이 앱에 필요한 것만 남긴 1.1MB 짜리다 —
+`slim_sparkle()` 이 매 빌드마다 깎는다.
+
+| 뗀 것 | 절감 | 이유 |
+|---|---|---|
+| x86_64 슬라이스 | 950KB | arm64 전용 앱이다 |
+| `XPCServices/` | 424KB | 샌드박스 앱 전용. Sparkle 문서도 떼라고 안내한다 |
+| `Headers`·`Modules` | 224KB | 빌드할 때만 필요하고, 빌드는 `vendor/` 원본을 본다 |
+| 로컬라이제이션 34개 | 292KB | 무음 업데이트라 Sparkle UI 를 볼 일이 없다. Base + `ko` 만 남긴다 |
+
+중첩 번들이 생겼으므로 서명은 안쪽부터 바깥으로 한다(`Updater.app` → `Autoupdate` → 프레임워크 → 앱).
+`--deep` 은 쓰지 않는다 — 중첩 번들에 바깥 앱의 서명 옵션을 덮어써서 공증에서 걸린다.
+로컬 빌드는 `SUEnableAutomaticChecks` 를 꺼서 개발 중인 빌드가 배포판으로 조용히 덮이지 않게 한다.
+
+업데이트 서명용 EdDSA 개인키는 키체인에만 있다. **이걸 잃으면 기존 사용자에게 업데이트를 영영 못
+보낸다** — 새 키로 서명한 걸 안 받기 때문이다. 백업은 `vendor/bin/generate_keys -x <파일>`.
 
 아이콘은 `build_icons.py` 가 만든다. `assets/design/keycap-master-v2.png` 는 우측 상단에서 본 3/4
 대각선 키캡이고 윗면이 `#ff00ff` 로 비워져 있다 — 그 마커 영역을 찾아 윗면 색으로 칠한 게
