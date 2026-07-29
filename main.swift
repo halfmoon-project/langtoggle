@@ -63,6 +63,11 @@ func toggleLanguage() {
 
 // MARK: - Self check
 
+if CommandLine.arguments.contains("--click") {
+    Sound.demo()
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--dump") {
     let v = IconView(frame: NSRect(x: 0, y: 0, width: 88, height: 88))
     let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds)!
@@ -79,6 +84,29 @@ if CommandLine.arguments.contains("--selftest") {
     assert(IconView.dragSize(44, dx: -12, dy: 0) == 32, "왼쪽으로 끌면 줄어든다")
     assert(IconView.dragSize(44, dx: 0, dy: 12) == 56, "아래로 끌면 커진다")
     assert(IconView.dragSize(44, dx: 3, dy: -12) == 32, "많이 움직인 축을 따른다")
+
+    // 클릭 파형. 소리 자체는 귀로 확인하고(--click) 여기선 모양만 본다.
+    for p in Sound.profiles {
+        for v in [p.down, p.up] {
+            let wave = Sound.render(v)
+            let s = wave.floatChannelData![0], n = Int(wave.frameLength)
+            assert(n == v.hits.map(Sound.length).max(), "\(p.id): 가장 늦게 끝나는 타격까지 담는다")
+            assert((0..<n).allSatisfy { abs(s[$0]) <= v.peak + 0.0001 }, "\(p.id): 안 넘친다")
+            // 최고점은 타격이 시작하는 자리다 — 어택이 뭉개졌으면 여기서 걸린다.
+            let top = (0..<n).max { abs(s[$0]) < abs(s[$1]) }!
+            assert(v.hits.contains { abs(Double(top) / 44100 - $0.at) < 0.002 }, "\(p.id): 어택이 선다")
+            assert(abs(s[n - 1]) < 0.0001, "\(p.id): 꼬리가 0 으로 끝난다")
+        }
+    }
+    // 소리 고르기. 사용자 설정을 건드리므로 끝나면 되돌려 놓는다.
+    let keep = UserDefaults.standard.string(forKey: "sound")
+    Sound.select(Sound.off)
+    assert(Sound.current == nil, "끄면 무음")
+    Sound.select("red")
+    assert(Sound.current?.id == "red", "고른 소리를 그대로 돌려준다")
+    Sound.select("없어진프리셋")
+    assert(Sound.current?.id == Sound.profiles[0].id, "모르는 id 는 무음 말고 기본 소리로")
+    if let keep { Sound.select(keep) } else { UserDefaults.standard.removeObject(forKey: "sound") }
 
     let a = currentID()
     toggleLanguage(); usleep(300_000)
@@ -235,6 +263,7 @@ final class IconView: NSView {
         startFrame = window?.frame ?? .zero
         startMouse = NSEvent.mouseLocation
         setPress(1)
+        Sound.down()
     }
 
     override func mouseDragged(with e: NSEvent) {
@@ -245,6 +274,7 @@ final class IconView: NSView {
                 guard hypot(m.x - startMouse.x, m.y - startMouse.y) > 3 else { return }
                 didResize = true
                 setPress(0)
+                Sound.up()
             }
             resize(to: Self.dragSize(startFrame.height,
                                      dx: m.x - startMouse.x, dy: startMouse.y - m.y),
@@ -253,12 +283,13 @@ final class IconView: NSView {
         }
         let moved = hypot(e.locationInWindow.x - downAt.x, e.locationInWindow.y - downAt.y)
         // performDrag는 마우스를 삼켜서 mouseUp이 안 온다 — 여기서 미리 올려준다.
-        if moved > 3 { setPress(0); window?.performDrag(with: e) }
+        if moved > 3 { setPress(0); Sound.up(); window?.performDrag(with: e) }
     }
 
+    /// 키캡이 올라오는 순간마다 한 번씩만 소리를 낸다 — 끌기로 이미 올라왔으면(didResize) 여기선 조용하다.
     override func mouseUp(with e: NSEvent) {
         setPress(0)
-        if !didResize { toggleLanguage() }
+        if !didResize { Sound.up(); toggleLanguage() }
         didResize = false  // 끄는 동안 화살표를 붙잡아 두던 플래그 — 여기서 푼다.
     }
 
@@ -295,6 +326,21 @@ final class IconView: NSView {
             item.state = abs((window?.frame.height ?? 0) - CGFloat(s)) < 0.5 ? .on : .off
         }
         menu.setSubmenu(sizes, for: sizeItem)
+        // 소리는 Sound.profiles 표를 그대로 옮긴다 — 프리셋을 늘리면 메뉴도 같이 는다.
+        let soundItem = menu.addItem(withTitle: "소리", action: nil, keyEquivalent: "")
+        let sounds = NSMenu()
+        let mute = sounds.addItem(withTitle: "끄기", action: #selector(setSound(_:)), keyEquivalent: "")
+        mute.target = self
+        mute.representedObject = Sound.off
+        mute.state = Sound.current == nil ? .on : .off
+        sounds.addItem(.separator())
+        for p in Sound.profiles {
+            let item = sounds.addItem(withTitle: p.name, action: #selector(setSound(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = p.id
+            item.state = Sound.current?.id == p.id ? .on : .off
+        }
+        menu.setSubmenu(sounds, for: soundItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "아이콘 새로고침", action: #selector(reloadImage), keyEquivalent: "").target = self
         menu.addItem(withTitle: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
@@ -310,6 +356,12 @@ final class IconView: NSView {
         }
         // 사용자가 시스템 설정에서 껐던 적이 있으면 수동 승인이 필요하다.
         if service.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+    }
+
+    /// 고르는 즉시 들려준다 — 이름만 보고는 어떤 소리인지 모른다.
+    @objc private func setSound(_ sender: NSMenuItem) {
+        Sound.select(sender.representedObject as? String ?? Sound.off)
+        if let p = Sound.current { Sound.preview(p) }
     }
 
     @objc private func setSize(_ sender: NSMenuItem) { resize(to: CGFloat(sender.tag)) }

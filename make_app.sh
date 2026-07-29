@@ -34,7 +34,8 @@ BUILD=build/LangToggle.app
 rm -rf build "$BUILD"
 mkdir -p "$BUILD/Contents/MacOS" "$BUILD/Contents/Resources/assets"
 
-swiftc -O main.swift -o "$BUILD/Contents/MacOS/LangToggle"
+# main.swift 하나가 아니라 루트의 .swift 를 다 넘긴다 — 파일이 늘어도 여기는 안 고친다.
+swiftc -O ./*.swift -o "$BUILD/Contents/MacOS/LangToggle"
 # 키캡 바디 한 장 + 언어별 글리프 레이어. assets/design/ 은 빌드 입력이라 안 들어간다.
 cp assets/*.png "$BUILD/Contents/Resources/assets/"
 # 로그인 항목 목록과 Finder에 보일 아이콘. sips -s format icns 는 실패해서 iconutil 을 쓴다.
