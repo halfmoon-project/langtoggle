@@ -287,8 +287,7 @@ final class IconView: NSView {
             if !didResize {
                 guard hypot(m.x - startMouse.x, m.y - startMouse.y) > 3 else { return }
                 didResize = true
-                setPress(0)
-                Sound.up()
+                setPress(0)  // 취소 신호라 조용히 올라온다 — mouseUp 의 주석을 같이 본다.
             }
             resize(to: Self.dragSize(startFrame.height,
                                      dx: m.x - startMouse.x, dy: startMouse.y - m.y),
@@ -296,22 +295,25 @@ final class IconView: NSView {
             return
         }
         let moved = hypot(e.locationInWindow.x - downAt.x, e.locationInWindow.y - downAt.y)
-        // performDrag는 mouseUp을 안 준다 — 여기서 미리 올려준다. 끄는 동안에도 mouseDragged는
-        // 계속 오는데, 창이 커서를 한 박자 늦게 쫓아오느라 moved 가 3 을 계속 넘나든다 —
-        // 래치가 없으면 옮기는 내내 딸깍거린다. 리사이즈 쪽 didResize 와 같은 역할이다.
+        // performDrag 중에도 mouseDragged 는 계속 오고, 창이 커서를 한 박자 늦게 쫓아오느라
+        // moved 가 3 을 계속 넘나든다 — 래치가 없으면 옮기는 내내 튕김이 되감기고 끌기가 겹쳐 걸린다.
         if moved > 3, !didDrag {
             didDrag = true
-            setPress(0)
-            Sound.up()
+            setPress(0)  // 취소 신호라 조용히 올라온다 — mouseUp 의 주석을 같이 본다.
             window?.performDrag(with: e)
         }
     }
 
-    /// 키캡이 올라오는 순간마다 한 번씩만 소리를 낸다 — 끌기로 이미 올라왔으면(didResize) 여기선 조용하다.
+    /// 올라오는 소리는 "전환됐다"는 신호다. 그래서 눌렀다 뗀 이 자리에서만 난다 —
+    /// 옮기기·크기조절은 전환을 취소한 제스처라 키캡이 조용히 올라온다.
+    /// 소리를 내면 창만 옮겼는데도 전환된 것처럼 들린다.
+    /// didDrag 는 원래 안 와야 정상이지만(performDrag 가 mouseUp 을 삼킨다), 삼킨다는 전제가
+    /// mouseDragged 쪽에서 이미 틀렸으므로 여기서도 믿지 않는다 — 옮기고서 언어가 바뀌면 안 된다.
     override func mouseUp(with e: NSEvent) {
         setPress(0)
-        if !didResize { Sound.up(); toggleLanguage() }
+        if !didResize && !didDrag { Sound.up(); toggleLanguage() }
         didResize = false  // 끄는 동안 화살표를 붙잡아 두던 플래그 — 여기서 푼다.
+        didDrag = false
     }
 
     /// 좌상단(anchor 기준)을 고정해 손잡이 쪽으로 자란다. 기본 위치가 화면 우상단이라 그대로 두면
