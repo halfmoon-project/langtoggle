@@ -163,6 +163,7 @@ final class IconView: NSView {
     private var startMouse = NSPoint.zero
     private var inGrip = false
     private var didResize = false
+    private var didDrag = false
     private var images: [String: NSImage?] = [:]
     private var press: CGFloat = 0 { didSet { needsDisplay = true } }
     private var anim: Timer?
@@ -272,6 +273,7 @@ final class IconView: NSView {
         downAt = e.locationInWindow
         inGrip = grip.contains(convert(e.locationInWindow, from: nil))
         didResize = false
+        didDrag = false
         startFrame = window?.frame ?? .zero
         startMouse = NSEvent.mouseLocation
         setPress(1)
@@ -294,8 +296,15 @@ final class IconView: NSView {
             return
         }
         let moved = hypot(e.locationInWindow.x - downAt.x, e.locationInWindow.y - downAt.y)
-        // performDrag는 마우스를 삼켜서 mouseUp이 안 온다 — 여기서 미리 올려준다.
-        if moved > 3 { setPress(0); Sound.up(); window?.performDrag(with: e) }
+        // performDrag는 mouseUp을 안 준다 — 여기서 미리 올려준다. 끄는 동안에도 mouseDragged는
+        // 계속 오는데, 창이 커서를 한 박자 늦게 쫓아오느라 moved 가 3 을 계속 넘나든다 —
+        // 래치가 없으면 옮기는 내내 딸깍거린다. 리사이즈 쪽 didResize 와 같은 역할이다.
+        if moved > 3, !didDrag {
+            didDrag = true
+            setPress(0)
+            Sound.up()
+            window?.performDrag(with: e)
+        }
     }
 
     /// 키캡이 올라오는 순간마다 한 번씩만 소리를 낸다 — 끌기로 이미 올라왔으면(didResize) 여기선 조용하다.
