@@ -3,6 +3,16 @@
     <channel>
         <title>LangToggle</title>
         <item>
+            <title>1.2.1</title>
+            <pubDate>Wed, 29 Jul 2026 19:26:56 +0900</pubDate>
+            <link>https://github.com/halfmoon-project/langtoggle</link>
+            <sparkle:version>1.2.1</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/halfmoon-project/langtoggle/releases/download/v1.2.1/LangToggle-1.2.1.zip" length="703759" type="application/octet-stream" sparkle:edSignature="286HwZ3B1vEO08nQiSqY7z0u3gEaJAh8hYtqqTg7Gp19Ojn2eGG9XYeyOYn+7sDEj4+gu2/APSTx4Vx4+n3BDQ=="/>
+        </item>
+        <item>
             <title>1.2.0</title>
             <pubDate>Wed, 29 Jul 2026 18:24:24 +0900</pubDate>
             <link>https://github.com/halfmoon-project/langtoggle</link>
