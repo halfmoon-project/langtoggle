@@ -97,6 +97,13 @@ if CommandLine.arguments.contains("--selftest") {
             assert(v.hits.contains { abs(Double(top) / 44100 - $0.at) < 0.002 }, "\(p.id): 어택이 선다")
             assert(abs(s[n - 1]) < 0.0001, "\(p.id): 꼬리가 0 으로 끝난다")
         }
+        let down = Sound.buffer(p, down: true)
+        let up = Sound.buffer(p, down: false)
+        assert(down.frameLength > 0 && up.frameLength > 0, "\(p.id): 누름·뗌 소리를 읽는다")
+        if p.sample != nil {
+            let fallbackLength = p.down.hits.map(Sound.length).max() ?? 0
+            assert(down.frameLength > fallbackLength, "\(p.id): 폴백 파형이 아니라 실제 녹음을 읽는다")
+        }
     }
     // 소리 고르기. 사용자 설정을 건드리므로 끝나면 되돌려 놓는다.
     let keep = UserDefaults.standard.string(forKey: "sound")

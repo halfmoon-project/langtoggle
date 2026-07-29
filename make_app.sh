@@ -38,6 +38,8 @@ mkdir -p "$BUILD/Contents/MacOS" "$BUILD/Contents/Resources/assets"
 swiftc -O ./*.swift -o "$BUILD/Contents/MacOS/LangToggle"
 # 키캡 바디 한 장 + 언어별 글리프 레이어. assets/design/ 은 빌드 입력이라 안 들어간다.
 cp assets/*.png "$BUILD/Contents/Resources/assets/"
+# 실제 타건 샘플 세 벌과 해당 라이선스. 14KB가 안 돼 합성음보다 자연스러운 쪽을 택했다.
+cp -R assets/sounds "$BUILD/Contents/Resources/assets/"
 # 로그인 항목 목록과 Finder에 보일 아이콘. sips -s format icns 는 실패해서 iconutil 을 쓴다.
 # 표시용 아이콘은 176px 라 .icns 에는 축소 전 원본(assets/design/appicon.png)을 쓴다.
 ICONSET=build/LangToggle.iconset
