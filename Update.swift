@@ -17,11 +17,23 @@ enum Updater {
     private static var controller: SPUStandardUpdaterController?
 
     /// 앱이 뜬 뒤 한 번 부른다. 이 시점부터 Sparkle 이 알아서 확인하러 다닌다.
+    ///
+    /// startingUpdater: false 로 만들고 직접 start() 한다. true 로 두면 시작 실패를 에러가 아니라
+    /// 모달 경고창으로 알리는데, LSUIElement 앱에서는 그 창이 보이지도 않는 채 프로세스가 붙잡힌다 —
+    /// 사용자 눈에는 키캡이 이유 없이 멈춘 걸로 보인다. 피드 주소 오타나 키 불일치 하나면 그 상태가 된다.
+    /// 업데이트를 못 하는 것보다 앱이 안 뜨는 게 훨씬 나쁘므로, 실패는 로그로만 남기고 넘어간다.
     static func start() {
         guard available, controller == nil else { return }
-        controller = SPUStandardUpdaterController(startingUpdater: true,
-                                                  updaterDelegate: nil,
-                                                  userDriverDelegate: nil)
+        let c = SPUStandardUpdaterController(startingUpdater: false,
+                                             updaterDelegate: nil,
+                                             userDriverDelegate: nil)
+        do {
+            try c.updater.start()
+        } catch {
+            NSLog("LangToggle: 업데이터 시작 실패 — \(error). --check-update 로 확인할 것")
+            return
+        }
+        controller = c
     }
 
     /// 수동 확인. .accessory 앱이라 활성화를 안 하면 Sparkle 창이 다른 앱 뒤에서 뜬다 —
